@@ -1,0 +1,95 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "ck kang"
+date: "2017-10-5"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## HAR(Human Activity Recognition) Data explanation
+
+We propose a dataset with 5 classes (sitting-down, standing-up, standing, walking, and sitting) collected on 8 hours of activities of 4 healthy subjects.
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. 
+
+## Goal
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+## Preparation: loading package and data
+```{r}
+library("caret")
+library("randomForest")
+library("rpart")
+library("rpart.plot")
+
+training <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+testing <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!", ""))  
+set.seed(9999)
+```
+
+## Preprocessing the data
+
+
+```{r}
+# eliminate the NA value
+training<-training[,colSums(is.na(training)) == 0]
+testing <-testing[,colSums(is.na(testing)) == 0]
+# Subset data
+training   <-training[,-c(1:7)]
+testing <-testing[,-c(1:7)]
+```
+
+## Cross Validation
+```{r}
+subSamples <- createDataPartition(y=training$classe, p=0.75, list=FALSE)
+subTraining <- training[subSamples, ] 
+subTesting <- training[-subSamples, ]
+```
+
+## Exploratory analysis
+
+The variable classe contains 5 levels. The plot of the outcome variable shows the frequency of each levels in the subTraining data.
+```{r}
+plot(subTraining$classe, col="orange", main="Levels of the variable classe", xlab="classe levels", ylab="Frequency")
+```
+## Prediction method
+
+```{r}
+## Decision Tree
+modFitDT <- rpart(classe ~ ., data=subTraining, method="class")
+predictDT <- predict(modFitDT, subTesting, type = "class")
+rpart.plot(modFitDT, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+confusionMatrix(predictDT, subTesting$classe)
+
+## Random Forest
+modFitRF <- randomForest(classe ~ ., data=subTraining, method="class")
+predictRF <- predict(modFitRF, subTesting, type = "class")
+confusionMatrix(predictRF, subTesting$classe)
+```
+
+## Conclusion
+The confusion matrices show, that the Random Forest algorithm performens better than decision trees. The accuracy for the Random Forest model was 0.9955 compared to 0.735 for Decision Tree model. The random Forest model is choosen.
+
+Expected out-of-sample error
+
+The expected out-of-sample error is estimated at 0.0045, or 0.45%. The expected out-of-sample error is calculated as 1 - accuracy for predictions made against the cross-validation set. Our Test data set comprises 20 cases. With an accuracy above 99% on our cross-validation data, we can expect that very few, or none, of the test samples will be missclassified.
+
+## Submission
+```{r}
+predictfinal <- predict(modFitRF, testing, type="class")
+predictfinal
+```
+# Write files
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(predictfinal)
+```
